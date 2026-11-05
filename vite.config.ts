@@ -4,8 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import siteConfiguration from './.figma/make/site.json'
-import { frontendAssets } from './.figma/make/import-assets.mjs'
 import { handleApiRequest } from './api/server.mjs'
 
 
@@ -21,11 +19,9 @@ export default defineConfig(({ mode }) => {
       minify: !emitSourcemaps,
     },
     plugins: [
-frontendAssets(),
 react(),
       tailwindcss(),
       simbaApiPlugin(),
-      figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
