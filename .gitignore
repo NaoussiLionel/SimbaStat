@@ -5,6 +5,8 @@ build/
 .env*
 /data/accounts.json
 /data/accounts.json.tmp
+/data/import-audit.json
+/data/import-audit.json.tmp
 .vite/
 vite.config.*.timestamp-*
 *.tsbuildinfo

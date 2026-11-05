@@ -9,6 +9,7 @@ const dataFile = path.resolve(here, '../data/elite-two-2026-27.json')
 const lineupsFile = path.resolve(here, '../data/elite-one-2026-27-lineups.json')
 const directoryFile = path.resolve(here, '../data/club-directory-elite-one-2026-27.json')
 const accountsFile = path.resolve(here, '../data/accounts.json')
+const importAuditFile = path.resolve(here, '../data/import-audit.json')
 try {
   const envText = await readFile(path.resolve(here, '../.env'), 'utf8')
   for (const line of envText.split(/\r?\n/)) {
@@ -39,6 +40,15 @@ async function writeAccounts(db) {
   const temp = `${accountsFile}.tmp`
   await writeFile(temp, JSON.stringify(db, null, 2) + '\n', 'utf8')
   await rename(temp, accountsFile)
+}
+async function writeJsonAtomically(file, value) {
+  const temp = `${file}.tmp`
+  await writeFile(temp, JSON.stringify(value, null, 2) + '\n', 'utf8')
+  await rename(temp, file)
+}
+async function readImportAudit() {
+  try { return JSON.parse((await readFile(importAuditFile, 'utf8')).replace(/^\uFEFF/, '')) }
+  catch (error) { if (error.code === 'ENOENT') return []; throw error }
 }
 const digest = value => createHash('sha256').update(value).digest('hex')
 const passwordHash = (password, salt) => new Promise((resolve, reject) => {
@@ -140,6 +150,44 @@ export async function handleApiRequest(req, res) {
       ])
     }
 
+    if (url.pathname === `${prefix}/admin/imports` && req.method === 'GET') {
+      if (!process.env.SIMBA_ADMIN_API_KEY) return json(res, 503, { error: 'Admin updates are not configured' })
+      if (!authorized(req)) return json(res, 401, { error: 'Unauthorized' })
+      const revisions = await readImportAudit()
+      return json(res, 200, { revisions: revisions.slice(-50).reverse() })
+    }
+
+    const rollbackPath = new RegExp(`^${prefix}/admin/imports/([a-f0-9]{24})/rollback$`).exec(url.pathname)
+    if (rollbackPath && req.method === 'POST') {
+      if (!process.env.SIMBA_ADMIN_API_KEY) return json(res, 503, { error: 'Admin updates are not configured' })
+      if (!authorized(req)) return json(res, 401, { error: 'Unauthorized' })
+      const { reviewNote = '' } = await body(req)
+      if (!String(reviewNote).trim()) return json(res, 400, { error: 'A reviewNote is required for rollback.' })
+      const audit = await readImportAudit(), sourceRevision = audit.find(item => item.id === rollbackPath[1] && item.status === 'applied')
+      if (!sourceRevision) return json(res, 404, { error: 'Applied revision not found' })
+      const data = await readData(), changed = []
+      for (const change of sourceRevision.changes) {
+        const current = data.matches.find(match => match.id === change.id)
+        const after = change.after
+        if (!current || current.homeScore !== after.homeScore || current.awayScore !== after.awayScore || current.status !== after.status || (current.sourceUrl || null) !== (after.sourceUrl || null) || (current.verifiedAt || null) !== (after.verifiedAt || null)) {
+          return json(res, 409, { error: 'A newer update changed one or more matches. Review the current scores before rolling back.', matchId: change.id })
+        }
+      }
+      const rolledBackAt = new Date().toISOString()
+      for (const change of sourceRevision.changes) {
+        const current = data.matches.find(match => match.id === change.id), before = { homeScore: current.homeScore, awayScore: current.awayScore, status: current.status, sourceUrl: current.sourceUrl || null, verifiedAt: current.verifiedAt || null }
+        Object.assign(current, change.before)
+        changed.push({ id: current.id, before, after: { homeScore: current.homeScore, awayScore: current.awayScore, status: current.status, sourceUrl: current.sourceUrl || null, verifiedAt: current.verifiedAt || null } })
+      }
+      const revision = { id: randomBytes(12).toString('hex'), status: 'pending', importedAt: rolledBackAt, rollbackOf: sourceRevision.id, checksum: digest(JSON.stringify(changed)), reviewNote: String(reviewNote).trim().slice(0, 500), changes: changed }
+      audit.push(revision)
+      await writeJsonAtomically(importAuditFile, audit)
+      await writeJsonAtomically(dataFile, data)
+      revision.status = 'applied'
+      await writeJsonAtomically(importAuditFile, audit)
+      return json(res, 200, { rolledBack: changed.length, revisionId: revision.id, rollbackOf: sourceRevision.id })
+    }
+
     if (req.method === 'GET' && url.pathname === `${prefix}/data/elite-two-2026-27`) {
       return json(res, 200, await readData(), 'public, max-age=300')
     }
@@ -163,23 +211,37 @@ export async function handleApiRequest(req, res) {
       if (!process.env.SIMBA_ADMIN_API_KEY) return json(res, 503, { error: 'Admin updates are not configured' })
       if (!authorized(req)) return json(res, 401, { error: 'Unauthorized' })
       const input = await body(req)
-      if (!Array.isArray(input.matches) || !input.matches.length) return json(res, 400, { error: 'Expected a non-empty matches array' })
+      if (!Array.isArray(input.matches) || !input.matches.length || input.matches.length > 100) return json(res, 400, { error: 'Provide between 1 and 100 match updates' })
       const data = await readData()
+      const clubIds = new Set(data.clubs.map(club => club.id)), seen = new Set(), prepared = []
       for (const update of input.matches) {
-        const current = data.matches.find(m => m.id === update.id)
-        if (!current || !Number.isInteger(update.homeScore) || !Number.isInteger(update.awayScore) || update.homeScore < 0 || update.awayScore < 0) {
-          return json(res, 400, { error: `Invalid or unknown match: ${String(update.id || '')}` })
+        if (!update || typeof update !== 'object' || Array.isArray(update)) return json(res, 400, { error: 'Each match update must be an object' })
+        const current = data.matches.find(m => m.id === update.id), sourceUrl = String(update.sourceUrl || input.sourceUrl || '')
+        let validSource = false
+        try { const parsed = new URL(sourceUrl); validSource = parsed.protocol === 'https:' || parsed.protocol === 'http:' } catch {}
+        if (!current || seen.has(update.id) || !clubIds.has(current.home) || !clubIds.has(current.away) || !Number.isInteger(update.homeScore) || !Number.isInteger(update.awayScore) || update.homeScore < 0 || update.awayScore < 0 || update.homeScore > 30 || update.awayScore > 30 || !validSource) {
+          return json(res, 400, { error: `Invalid match update or source: ${String(update.id || '')}` })
         }
-        current.homeScore = update.homeScore
-        current.awayScore = update.awayScore
-        current.status = 'played'
-        current.verifiedAt = new Date().toISOString()
-        current.sourceUrl = typeof update.sourceUrl === 'string' ? update.sourceUrl : null
+        seen.add(update.id)
+        prepared.push({ current, update, sourceUrl })
       }
-      const tempFile = `${dataFile}.tmp`
-      await writeFile(tempFile, JSON.stringify(data, null, 2) + '\n', 'utf8')
-      await rename(tempFile, dataFile)
-      return json(res, 200, { updated: input.matches.length })
+      const conflicts = prepared.filter(({ current, update }) => current.status === 'played' && (current.homeScore !== update.homeScore || current.awayScore !== update.awayScore))
+      if (conflicts.length && input.reviewConflicts !== true) return json(res, 409, { error: 'Conflicting confirmed scores need review before they can be changed.', conflicts: conflicts.map(({ current, update }) => ({ id: current.id, current: [current.homeScore, current.awayScore], incoming: [update.homeScore, update.awayScore] })), action: 'Repeat the import with reviewConflicts=true and a reviewNote after checking the source.' })
+      if (conflicts.length && !String(input.reviewNote || '').trim()) return json(res, 400, { error: 'A reviewNote is required when approving changed confirmed scores.' })
+
+      const verifiedAt = new Date().toISOString()
+      const changes = prepared.map(({ current, update, sourceUrl }) => {
+        const before = { homeScore: current.homeScore, awayScore: current.awayScore, status: current.status, sourceUrl: current.sourceUrl || null, verifiedAt: current.verifiedAt || null }
+        Object.assign(current, { homeScore: update.homeScore, awayScore: update.awayScore, status: 'played', verifiedAt, sourceUrl })
+        return { id: current.id, before, after: { homeScore: current.homeScore, awayScore: current.awayScore, status: current.status, sourceUrl, verifiedAt } }
+      })
+      const audit = await readImportAudit(), revision = { id: randomBytes(12).toString('hex'), status: 'pending', importedAt: verifiedAt, sourceUrl: String(input.sourceUrl || prepared[0].sourceUrl), checksum: digest(JSON.stringify(input.matches)), reviewNote: String(input.reviewNote || '').trim() || null, changes }
+      audit.push(revision)
+      await writeJsonAtomically(importAuditFile, audit)
+      await writeJsonAtomically(dataFile, data)
+      revision.status = 'applied'
+      await writeJsonAtomically(importAuditFile, audit)
+      return json(res, 200, { updated: changes.length, revisionId: revision.id, checksum: revision.checksum })
     }
 
     return json(res, 404, { error: 'Not found' })

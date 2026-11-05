@@ -31,7 +31,9 @@ Standings, best attack/defence, goal totals, and form should be derived from ver
 - `GET /api/v1/seasons/:seasonId/leaders?metric=goals|assists|keeper_clean_sheets`
 - `GET /api/v1/seasons/elite-one-2026-27/lineups` returns confirmed match sheets with formation, starters, substitutes, source URL, verification time, and status. The club roster view uses published match lineups when available; it does not derive a starting XI from registered players.
 - `GET /api/v1/seasons/elite-one-2026-27/club-directory` returns club leadership, technical staff, stadium details, and source/verification metadata. Unknown fields remain `null` and appear as “À confirmer” in the interface.
-- `POST /api/v1/admin/imports` for authenticated data updates, with schema validation and audit log
+- `POST /api/v1/admin/imports` for authenticated data updates. Imports validate every match and source before writing, reject duplicate IDs and unsafe scores, and return `409` when a confirmed score changes. After checking the source, an administrator can explicitly approve the conflict with `reviewConflicts: true` and a `reviewNote`.
+- `GET /api/v1/admin/imports` returns the latest 50 import revisions to an authenticated administrator. Each revision records the source, checksum, before/after values, review note, timestamp, and write status. Runtime history is stored in the ignored `data/import-audit.json` file.
+- `POST /api/v1/admin/imports/:revisionId/rollback` restores an applied revision only when the affected match records have not changed since it was applied; a review note is required.
 
 The current local data files are `data/elite-one-2026-27-lineups.json` and `data/club-directory-elite-one-2026-27.json`. Populate a field only after checking an attributable federation or club source; include `sourceUrl` and `verifiedAt` with each verified update. Do not infer home grounds, officials, staff, or lineups.
 
@@ -52,8 +54,10 @@ The Vite client may know only `VITE_API_BASE_URL`, which is public configuration
 ## Import and update lifecycle
 
 1. Fetch from an approved source on the server.
-2. Validate IDs, club/competition membership, kickoff, score ranges, and match status.
-3. Save source URL, retrieval timestamp, and a content checksum.
-4. Flag conflicting or low-confidence changes for review; do not overwrite a verified result silently.
-5. Recompute standings and leaders from accepted records.
-6. Expose read-only data to the app; retain a revision history and rollback path.
+2. Validate every match ID, club membership, duplicate, score range, and source URL before changing any result.
+3. Save source URL, verification timestamp, and a SHA-256 checksum with the revision.
+4. Conflicting confirmed scores return `409` and are not changed unless an administrator resubmits them with `reviewConflicts: true` and a review note.
+5. Each accepted import stores before/after values and a pending/applied status in `data/import-audit.json`; use the authenticated rollback endpoint to restore a revision when the current records still match its saved after-values.
+6. Standings and league totals are derived from `status: "played"` records only. Predictions and unconfirmed scores stay out of those calculations.
+
+The current account store is still a local development store, and push delivery still needs a managed account database plus configured push credentials. Do not deploy account registration or promise off-device notifications until those services are configured.
