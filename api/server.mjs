@@ -125,7 +125,7 @@ export async function handleApiRequest(req, res) {
     if (url.pathname === `${prefix}/account/register` && req.method === 'POST') {
       if (rateLimited(req)) return json(res, 429, { error: 'Trop de tentatives. Réessayez dans quelques minutes.' })
       const input = await body(req), email = String(input.email || '').trim().toLowerCase(), password = String(input.password || '')
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 12 || password.length > 200) return json(res, 400, { error: 'Vérifiez votre adresse e-mail et choisissez un mot de passe de 12 caractères minimum.' })
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 6 || password.length > 200) return json(res, 400, { error: 'Vérifiez votre adresse e-mail et choisissez un mot de passe de 6 caractères minimum.' })
       const db = await readAccounts()
       if (db.users.some(user => user.email === email)) return json(res, 409, { error: 'Un compte existe déjà avec cette adresse e-mail.' })
       const salt = randomBytes(16).toString('hex'), user = { id: randomBytes(16).toString('hex'), email, salt, passwordHash: await passwordHash(password, salt), preferences: cleanPreferences(input.preferences), createdAt: new Date().toISOString() }
