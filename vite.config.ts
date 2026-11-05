@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
 react(),
       tailwindcss(),
+      clubAssetsPlugin(),
       simbaApiPlugin(),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
@@ -48,6 +49,34 @@ react(),
     },
   }
 })
+
+/** Copy committed club logos/icons into Vite's production output. */
+function clubAssetsPlugin(): Plugin {
+  const sourceRoot = path.resolve(__dirname, 'clubs')
+
+  function collectFiles(dir: string): string[] {
+    if (!fs.existsSync(dir)) return []
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+      const fullPath = path.join(dir, entry.name)
+      return entry.isDirectory() ? collectFiles(fullPath) : [fullPath]
+    })
+  }
+
+  return {
+    name: 'simba-club-assets',
+    apply: 'build',
+    generateBundle() {
+      for (const file of collectFiles(sourceRoot)) {
+        const relativePath = path.relative(sourceRoot, file).split(path.sep).join('/')
+        this.emitFile({
+          type: 'asset',
+          fileName: `clubs/${relativePath}`,
+          source: fs.readFileSync(file),
+        })
+      }
+    },
+  }
+}
 
 /** Serve the API in-process so preview environments do not depend on a second port. */
 function simbaApiPlugin(): Plugin {
