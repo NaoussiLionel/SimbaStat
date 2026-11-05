@@ -36,7 +36,7 @@ async function readJsonFile(file) {
 const accountsBlobPath = 'simba-stat/accounts.json'
 
 async function readAccounts() {
-  if (process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN) {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
       const result = await get(accountsBlobPath, { access: 'private', useCache: false })
       if (!result) return { users: [], sessions: [] }
@@ -52,8 +52,9 @@ async function readAccounts() {
 }
 
 async function writeAccounts(db) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.VERCEL) throw new Error('BLOB_READ_WRITE_TOKEN is not configured on Vercel')
   const payload = JSON.stringify(db, null, 2) + '\n'
-  if (process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN) {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
     await put(accountsBlobPath, payload, { access: 'private', allowOverwrite: true })
     return
   }
