@@ -3,6 +3,7 @@ import { createServer } from 'node:http'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { get, put } from '@vercel/blob'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataFile = path.resolve(here, '../data/elite-two-2026-27.json')
@@ -32,13 +33,32 @@ async function readJsonFile(file) {
   return JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''))
 }
 
+const accountsBlobPath = 'simba-stat/accounts.json'
+
 async function readAccounts() {
+  if (process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const result = await get(accountsBlobPath, { access: 'private', useCache: false })
+      if (!result) return { users: [], sessions: [] }
+      const text = await new Response(result.stream).text()
+      return JSON.parse(text.replace(/^\uFEFF/, ''))
+    } catch (error) {
+      if (error?.statusCode === 404 || error?.status === 404) return { users: [], sessions: [] }
+      throw error
+    }
+  }
   try { return JSON.parse((await readFile(accountsFile, 'utf8')).replace(/^\uFEFF/, '')) }
   catch (error) { if (error.code === 'ENOENT') return { users: [], sessions: [] }; throw error }
 }
+
 async function writeAccounts(db) {
+  const payload = JSON.stringify(db, null, 2) + '\n'
+  if (process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN) {
+    await put(accountsBlobPath, payload, { access: 'private', allowOverwrite: true })
+    return
+  }
   const temp = `${accountsFile}.tmp`
-  await writeFile(temp, JSON.stringify(db, null, 2) + '\n', 'utf8')
+  await writeFile(temp, payload, 'utf8')
   await rename(temp, accountsFile)
 }
 async function writeJsonAtomically(file, value) {
