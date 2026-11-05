@@ -1,0 +1,15 @@
+{
+  "name": "Simba Stat",
+  "short_name": "Simba Stat",
+  "description": "Résultats et statistiques du football camerounais",
+  "lang": "fr-CM",
+  "start_url": "/#accueil",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f1f6f2",
+  "theme_color": "#0b5d33",
+  "icons": [
+    { "src": "/icons/simba-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

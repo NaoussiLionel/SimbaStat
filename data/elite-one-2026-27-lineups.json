@@ -1,0 +1,54 @@
+{
+  "seasonId": "elite-one-2026-27",
+  "competitionId": "elite-one",
+  "lineups": [],
+  "previewLineups": [
+    {
+      "matchId": "match-3-dynamo-coton",
+      "previewOnly": true,
+      "home": {
+        "formation": "4-3-3",
+        "starters": [
+          { "shirtNumber": 1, "name": "Moussa Aoudou", "position": "GK" },
+          { "shirtNumber": 2, "name": "Fernand Beyang Arrey", "position": "RB" },
+          { "shirtNumber": 4, "name": "Marc Dynam Atangana", "position": "CB" },
+          { "shirtNumber": 5, "name": "Rene Donald Bitjick Nkondjock", "position": "CB" },
+          { "shirtNumber": 3, "name": "Pierre Ikong", "position": "LB" },
+          { "shirtNumber": 6, "name": "Blamdi Emmanuel Cays", "position": "DM" },
+          { "shirtNumber": 8, "name": "Guy Marcel Essomo Bagneken", "position": "CM" },
+          { "shirtNumber": 10, "name": "Vittel Feumi Yanou", "position": "CM" },
+          { "shirtNumber": 7, "name": "Brian Arthur Ekwem Esseme", "position": "RW" },
+          { "shirtNumber": 9, "name": "Karim Hamadou Moumini", "position": "ST" },
+          { "shirtNumber": 11, "name": "Jules Armand Kooh Bioumla", "position": "LW" }
+        ],
+        "substitutes": []
+      },
+      "away": {
+        "formation": "4-3-3",
+        "starters": [
+          { "shirtNumber": 1, "name": "Moubarak Abdoul Aziz", "position": "GK" },
+          { "shirtNumber": 2, "name": "Mohamadou Ahmadou Ahidjo", "position": "RB" },
+          { "shirtNumber": 4, "name": "Gadin Allambatnan", "position": "CB" },
+          { "shirtNumber": 5, "name": "Daniel Andela Mendje", "position": "CB" },
+          { "shirtNumber": 3, "name": "Frederic Dawai Goulva", "position": "LB" },
+          { "shirtNumber": 6, "name": "Abdouraman Daman Bouba", "position": "DM" },
+          { "shirtNumber": 8, "name": "Tanko Mohamadou Dan Assabe", "position": "CM" },
+          { "shirtNumber": 10, "name": "Emmanuel Parfait Dakana Kibe", "position": "CM" },
+          { "shirtNumber": 7, "name": "Carlos Amadou Yougouda", "position": "RW" },
+          { "shirtNumber": 9, "name": "Yvane Thierry Aloukou Essepe", "position": "ST" },
+          { "shirtNumber": 11, "name": "Dieu Ne Dort Pascal Avama Adjini", "position": "LW" }
+        ],
+        "substitutes": []
+      }
+    }
+  ],
+  "schema": {
+    "matchId": "match-<round>-<homeClubId>-<awayClubId>",
+    "home": { "formation": "4-3-3", "starters": [{ "playerId": "public-player-id", "shirtNumber": 1, "name": "Player name", "position": "GK" }], "substitutes": [] },
+    "away": { "formation": "4-4-2", "starters": [], "substitutes": [] },
+    "sourceUrl": "Official team sheet URL",
+    "verifiedAt": "ISO-8601 timestamp",
+    "status": "confirmed"
+  },
+  "note": "No official starting elevens or benches have been verified for this dataset yet. Visual-only demos use names from the 2025/26 reference squads when available and placeholders otherwise; selections, shirt numbers, formations, and positions are illustrative and must not be treated as match facts."
+}

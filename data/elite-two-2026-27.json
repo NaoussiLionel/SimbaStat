@@ -1,0 +1,47 @@
+{
+  "seasonId": "elite-two-2026-27",
+  "competition": { "id": "elite-two", "name": "MTN Elite Two", "season": "2026/27", "level": 2 },
+  "asOf": "2026-11-05",
+  "source": {
+    "calendar": "https://fecafoot-officiel.com/wp-content/uploads/2026/10/MTN_ELITE_TWO_2026-2027_Calendrier.pdf",
+    "results": "https://fr.soccerway.com/cameroun/elite-two/resultats/",
+    "crossCheck": "https://www.insidecameroonsport.cm/FOOTBALL/ligue/EDEUX2027",
+    "retrievedAt": "2026-11-05"
+  },
+  "clubs": [
+    {"id":"elecsport","name":"Elecsport FC"}, {"id":"mintack","name":"Mintack FC"},
+    {"id":"fauve","name":"Fauve Azur Elite"}, {"id":"bamboutos","name":"Bamboutos FC"},
+    {"id":"astres","name":"Les Astres FC"}, {"id":"kumba","name":"Kumba City FC"},
+    {"id":"tonnerre","name":"Tonnerre Kalara Club"}, {"id":"sable","name":"Sable FC de Batié"},
+    {"id":"avion","name":"Avion Academy FC"}, {"id":"atlantic","name":"Atlantic SA"},
+    {"id":"fap","name":"AS FAP"}, {"id":"fortuna","name":"AS Fortuna Mfou"}
+  ],
+  "matches": [
+    {"id":"e2-2026-27-r1-elecsport-mintack","round":1,"date":"2026-10-24","home":"elecsport","away":"mintack","homeScore":1,"awayScore":1,"status":"played"},
+    {"id":"e2-2026-27-r1-astres-kumba","round":1,"date":"2026-10-25","home":"astres","away":"kumba","homeScore":2,"awayScore":1,"status":"played"},
+    {"id":"e2-2026-27-r1-avion-atlantic","round":1,"date":"2026-10-25","home":"avion","away":"atlantic","homeScore":0,"awayScore":1,"status":"played"},
+    {"id":"e2-2026-27-r1-tonnerre-sable","round":1,"date":"2026-10-25","home":"tonnerre","away":"sable","homeScore":3,"awayScore":1,"status":"played"},
+    {"id":"e2-2026-27-r1-fauve-bamboutos","round":1,"date":"2026-10-24","home":"fauve","away":"bamboutos","homeScore":0,"awayScore":2,"status":"played"},
+    {"id":"e2-2026-27-r1-fap-fortuna","round":1,"date":null,"home":"fap","away":"fortuna","homeScore":null,"awayScore":null,"status":"awaiting_confirmation"},
+    {"id":"e2-2026-27-r2-atlantic-fortuna","round":2,"date":"2026-11-01","home":"atlantic","away":"fortuna","homeScore":0,"awayScore":0,"status":"played"},
+    {"id":"e2-2026-27-r2-kumba-sable","round":2,"date":"2026-11-01","home":"kumba","away":"sable","homeScore":1,"awayScore":2,"status":"played"},
+    {"id":"e2-2026-27-r2-mintack-fauve","round":2,"date":"2026-11-01","home":"mintack","away":"fauve","homeScore":1,"awayScore":1,"status":"played"},
+    {"id":"e2-2026-27-r2-fap-elecsport","round":2,"date":"2026-10-31","home":"fap","away":"elecsport","homeScore":1,"awayScore":1,"status":"played"},
+    {"id":"e2-2026-27-r2-bamboutos-tonnerre","round":2,"date":"2026-10-31","home":"bamboutos","away":"tonnerre","homeScore":3,"awayScore":0,"status":"played"},
+    {"id":"e2-2026-27-r2-astres-avion","round":2,"date":"2026-10-31","home":"astres","away":"avion","homeScore":0,"awayScore":2,"status":"played"}
+  ],
+  "predictions": [
+    {"id":"e2-2026-27-r3-astres-elecsport","round":3,"date":"2026-11-08","home":"astres","away":"elecsport","homeScore":1,"awayScore":1,"status":"projected","confidence":"low"},
+    {"id":"e2-2026-27-r3-fortuna-sable","round":3,"date":"2026-11-07","home":"fortuna","away":"sable","homeScore":1,"awayScore":1,"status":"projected","confidence":"low"},
+    {"id":"e2-2026-27-r3-fauve-fap","round":3,"date":"2026-11-07","home":"fauve","away":"fap","homeScore":1,"awayScore":0,"status":"projected","confidence":"low"},
+    {"id":"e2-2026-27-r3-avion-bamboutos","round":3,"date":"2026-11-08","home":"avion","away":"bamboutos","homeScore":1,"awayScore":1,"status":"projected","confidence":"low"},
+    {"id":"e2-2026-27-r3-atlantic-mintack","round":3,"date":"2026-11-08","home":"atlantic","away":"mintack","homeScore":1,"awayScore":0,"status":"projected","confidence":"low"},
+    {"id":"e2-2026-27-r3-kumba-tonnerre","round":3,"date":"2026-11-08","home":"kumba","away":"tonnerre","homeScore":0,"awayScore":1,"status":"projected","confidence":"low"}
+  ],
+  "dataNotes": [
+    "The official 2026/27 calendar schedules a 12-club single group. FECAFOOT's Elite Two competition page still displays two groups; verify format before importing the remainder of the season.",
+    "Round 1 AS FAP–AS Fortuna has no confirmed score in the consulted results sources and remains awaiting_confirmation.",
+    "Goalkeeper clean-sheet totals are not imported because goalkeeper appearances are unavailable.",
+    "The round 3 score estimates are low-confidence projections, not official results; they are stored separately from matches and excluded from standings."
+  ]
+}
