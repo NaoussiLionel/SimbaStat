@@ -1139,21 +1139,23 @@ const pSeasonRows=p=>{
   const ev=pEvents(p), has26=ev.length>0;
   const s25=S25.find(s=>pfid(s[0])===p[2]), s24=S24.find(s=>pfid(s[0])===p[2]);
   const cur=ev[0]?ev[0].t:null;
+  const eventMatches=new Set(ev.map(e=>e.m));
+  const base={appearances:"n.d.",yellow:"n.d.",red:"n.d."};
   return [
-    {key:"26",label:"2026/27",club:cur,goals:has26?ev.filter(e=>pNameMatch(e.p,p)).length:"—",assists:has26?ev.filter(e=>e.a&&pNameMatch(e.a,p)).length:"—",comp:"Elite One",ref:false},
-    {key:"25",label:"2025/26",club:s25?s25[1]:p[1],goals:s25?s25[2]:"—",assists:S25A[p[2]]??"—",comp:"Elite One",ref:false},
-    {key:"24",label:"2024/25",club:s24?s24[1]:p[1],goals:s24?s24[2]:"—",assists:S24A[p[2]]??"—",comp:"Elite One",ref:!s24}
+    {key:"26",label:"2026/27",club:cur,appearances:has26?eventMatches.size:base.appearances,goals:has26?ev.filter(e=>pNameMatch(e.p,p)).length:"—",assists:has26?ev.filter(e=>e.a&&pNameMatch(e.a,p)).length:"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:false},
+    {key:"25",label:"2025/26",club:s25?s25[1]:p[1],appearances:base.appearances,goals:s25?s25[2]:"—",assists:S25A[p[2]]??"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:false},
+    {key:"24",label:"2024/25",club:s24?s24[1]:p[1],appearances:base.appearances,goals:s24?s24[2]:"—",assists:S24A[p[2]]??"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:!s24}
   ];
 };
-const pTotals=rows=>{
+const pTotals=rows=>{const pTotals=rows=>{
   const g=rows.filter(r=>typeof r.goals==="number"), a=rows.filter(r=>typeof r.assists==="number");
   return {g:g.length?g.reduce((s,r)=>s+r.goals,0):"—",a:a.length?a.reduce((s,r)=>s+r.assists,0):"—"};
 };
 const pSeasonTable=(rows,totals,foot)=>{
-  const body=rows.map(r=>`<tr><td>${r.label}</td><td class="l">${r.club?(C[r.club]?tmLink(r.club):htm(r.club)):"—"}${r.ref?` <small class="note">réf.</small>`:""}</td><td>${r.goals}</td><td>${r.assists}</td><td class="hide-s">${r.comp}</td></tr>`).join("");
-  return `<div class="card scroll pcareer"><table><thead><tr><th>Saison</th><th class="l">Club</th><th>Buts</th><th>Passes déc.</th><th class="hide-s">Compétition</th></tr></thead><tbody>${body}</tbody>${foot?`<tfoot><tr><td class="l"><b>Total connu</b></td><td></td><td><b>${totals.g}</b></td><td><b>${totals.a}</b></td><td class="hide-s"></td></tr></tfoot>`:""}</table></div>`;
+  const body=rows.map(r=>`<tr><td>${r.label}</td><td class="l">${r.club?(C[r.club]?tmLink(r.club):htm(r.club)):"—"}${r.ref?` <small class="note">réf.</small>`:""}</td><td>${r.appearances}</td><td>${r.goals}</td><td>${r.assists}</td><td>${r.yellow}</td><td>${r.red}</td><td class="hide-s">${r.comp}</td></tr>`).join("");
+  return `<div class="card scroll pcareer"><table><thead><tr><th>Saison</th><th class="l">Club</th><th>Apparitions</th><th>Buts</th><th>Passes déc.</th><th>Cartons jaunes</th><th>Cartons rouges</th><th class="hide-s">Compétition</th></tr></thead><tbody>${body}</tbody>${foot?`<tfoot><tr><td class="l"><b>Total connu</b></td><td></td><td><b>n.d.</b></td><td><b>${totals.g}</b></td><td><b>${totals.a}</b></td><td><b>n.d.</b></td><td><b>n.d.</b></td><td class="hide-s"></td></tr></tfoot>`:""}</table></div>`;
 };
-function playerPage(fid){
+function playerPage(fid){function playerPage(fid){
   const p=ROSTER.find(x=>x[2]===fid);
   if(!p)return `<div class="card empty">Joueur introuvable.</div>`;
   const rows=pSeasonRows(p), tot=pTotals(rows);
@@ -1187,7 +1189,7 @@ function playerPanel(){
       <div class="card psec"><h3>Coéquipiers 2025-26</h3>${mates.length?mates.map(x=>`<a class="prow" href="${playerHref(x[2])}"><span>${PN(x[0])}</span><b>→</b></a>`).join(""):`<div class="empty">Effectif non fourni.</div>`}<div class="note" style="padding:0 16px 12px">Effectif FECAFOOT 2025/2026 · postes et numéros non renseignés.</div></div>
       ${C[p[1]]?`<div class="card psec"><h3>Forme du club</h3><div class="prow"><span>5 derniers matchs</span><span>${fm(SB[p[1]].f)}</span></div><div class="prow"><span>Classement</span><b class="txt">${SB[p[1]].pos}e · ${SB[p[1]].pts} pts</b></div></div>`:""}
     </div>
-    <p class="note">Profil basé sur l'effectif FECAFOOT 2025/2026. Les buts 2025-26 proviennent du top 10 des buteurs publié ; les buts 2024-25 du top 3. Les matchs joués, minutes, tirs, passes, duels et cartons ne sont pas fournis par la source.</p>`;
+    <p class="note">Profil basé sur l'effectif FECAFOOT 2025/2026. Les buts 2025-26 proviennent du top 10 des buteurs publié ; les buts 2024-25 du top 3. Les apparitions et cartons restent n.d. tant que les feuilles de match et événements disciplinaires correspondants ne sont pas publiés.</p>`;
   }
   if(PS.tab==="matchs"){
     if(PS.season==="25"||PS.season==="24")return filter+`<div class="card empty">Les feuilles de match de cette saison ne sont pas disponibles.</div>`;
