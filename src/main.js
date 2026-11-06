@@ -1314,6 +1314,54 @@ function mBind(){
   document.querySelectorAll("[data-mt]").forEach(b=>b.onclick=()=>{MS.tab=b.dataset.mt;draw()});draw();
 }
 
+function initPrivacyConsent(){
+  if(document.getElementById("cookieConsent"))return;
+  const key="simba-stat-consent";
+  const saved=(()=>{try{return JSON.parse(localStorage.getItem(key)||"null")}catch{return null}})();
+  const panel=document.createElement("section");
+  panel.id="cookieConsent";
+  panel.className="cookie-consent";
+  panel.hidden=!!saved;
+  panel.setAttribute("aria-labelledby","cookieTitle");
+  panel.innerHTML=\`
+    <h2 id="cookieTitle">Nous respectons votre vie privée</h2>
+    <p>SimbaStat utilise des cookies et technologies similaires pour assurer le fonctionnement du site et mémoriser vos choix. Les catégories optionnelles restent désactivées tant que vous ne les avez pas acceptées. Consultez notre <a href="/confidentialite/">Politique de confidentialité</a> et notre <a href="/cookies/">Politique cookies</a>.</p>
+    <div class="cookie-actions">
+      <button type="button" data-cookie="accept" class="primary">Tout accepter</button>
+      <button type="button" data-cookie="reject">Tout refuser</button>
+      <button type="button" data-cookie="manage">Gérer mes préférences</button>
+    </div>
+    <div class="cookie-preferences" aria-label="Préférences cookies">
+      <label class="cookie-option"><span><b>Nécessaires</b><span>Session, sécurité et fonctionnement essentiel du site.</span></span><input type="checkbox" checked disabled></label>
+      <label class="cookie-option"><span><b>Mesure d’audience</b><span>Permettrait de mesurer l'utilisation du site si un outil d'audience est activé.</span></span><input id="cookieAnalytics" type="checkbox"></label>
+      <label class="cookie-option"><span><b>Personnalisation</b><span>Permettrait de mémoriser des préférences avancées si cette fonctionnalité est activée.</span></span><input id="cookiePersonalization" type="checkbox"></label>
+      <label class="cookie-option"><span><b>Publicité</b><span>Permettrait d'activer des technologies publicitaires si SimbaStat en utilise.</span></span><input id="cookieAds" type="checkbox"></label>
+      <div class="cookie-actions"><button type="button" data-cookie="save" class="primary">Enregistrer mes choix</button></div>
+    </div>\`;
+  document.body.appendChild(panel);
+  const float=document.createElement("button");
+  float.type="button";float.className="cookie-float";float.title="Gérer mes préférences de confidentialité";float.setAttribute("aria-label","Gérer mes préférences de confidentialité");float.textContent="⚙";
+  document.body.appendChild(float);
+  const close=choices=>{
+    localStorage.setItem(key,JSON.stringify({necessary:true,analytics:!!choices.analytics,personalization:!!choices.personalization,ads:!!choices.ads,updatedAt:new Date().toISOString()}));
+    panel.hidden=true;panel.classList.remove("manage");
+  };
+  const setAll=v=>{
+    panel.querySelector("#cookieAnalytics").checked=v;
+    panel.querySelector("#cookiePersonalization").checked=v;
+    panel.querySelector("#cookieAds").checked=v;
+  };
+  panel.querySelector('[data-cookie="accept"]').onclick=()=>{setAll(true);close({analytics:true,personalization:true,ads:true})};
+  panel.querySelector('[data-cookie="reject"]').onclick=()=>{setAll(false);close({analytics:false,personalization:false,ads:false})};
+  panel.querySelector('[data-cookie="manage"]').onclick=()=>{panel.hidden=false;panel.classList.toggle("manage")};
+  panel.querySelector('[data-cookie="save"]').onclick=()=>close({
+    analytics:panel.querySelector("#cookieAnalytics").checked,
+    personalization:panel.querySelector("#cookiePersonalization").checked,
+    ads:panel.querySelector("#cookieAds").checked
+  });
+  float.onclick=()=>{panel.hidden=false;panel.classList.add("manage")};
+}
+
 function route(){
   let v=(location.hash||"#accueil").slice(1);
   let nav=v;CM=null;CP=null;CC=null;
@@ -1330,6 +1378,7 @@ function route(){
   document.querySelectorAll("[data-league]").forEach(b=>b.onclick=()=>{CLS.league=b.dataset.league;route()});
   document.querySelectorAll("[data-league-target]").forEach(b=>b.onclick=()=>{CLS.league=b.dataset.leagueTarget});
   document.querySelectorAll("[data-club-row]").forEach(row=>row.onclick=event=>{if(event.target.closest("a,button"))return;location.hash=`club-${row.dataset.clubRow}`});
+  initPrivacyConsent();
   bindAccount();
   matchBody();statsBody();mBind();cBind();pBind();renderLanguage();window.scrollTo(0,0);
 }
