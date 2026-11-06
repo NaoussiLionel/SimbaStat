@@ -1146,7 +1146,7 @@ const pSeasonRows=p=>{
     {key:"24",label:"2024/25",club:s24?s24[1]:p[1],appearances:base.appearances,goals:s24?s24[2]:"—",assists:S24A[p[2]]??"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:!s24}
   ];
 };
-const pTotals=rows=>{const pTotals=rows=>{
+const pTotals=rows=>{
   const g=rows.filter(r=>typeof r.goals==="number"), a=rows.filter(r=>typeof r.assists==="number");
   return {g:g.length?g.reduce((s,r)=>s+r.goals,0):"—",a:a.length?a.reduce((s,r)=>s+r.assists,0):"—"};
 };
@@ -1154,7 +1154,7 @@ const pSeasonTable=(rows,totals,foot)=>{
   const body=rows.map(r=>`<tr><td>${r.label}</td><td class="l">${r.club?(C[r.club]?tmLink(r.club):htm(r.club)):"—"}${r.ref?` <small class="note">réf.</small>`:""}</td><td>${r.appearances}</td><td>${r.goals}</td><td>${r.assists}</td><td>${r.yellow}</td><td>${r.red}</td><td class="hide-s">${r.comp}</td></tr>`).join("");
   return `<div class="card scroll pcareer"><table><thead><tr><th>Saison</th><th class="l">Club</th><th>Apparitions</th><th>Buts</th><th>Passes déc.</th><th>Cartons jaunes</th><th>Cartons rouges</th><th class="hide-s">Compétition</th></tr></thead><tbody>${body}</tbody>${foot?`<tfoot><tr><td class="l"><b>Total connu</b></td><td></td><td><b>n.d.</b></td><td><b>${totals.g}</b></td><td><b>${totals.a}</b></td><td><b>n.d.</b></td><td><b>n.d.</b></td><td class="hide-s"></td></tr></tfoot>`:""}</table></div>`;
 };
-function playerPage(fid){function playerPage(fid){
+function playerPage(fid){
   const p=ROSTER.find(x=>x[2]===fid);
   if(!p)return `<div class="card empty">Joueur introuvable.</div>`;
   const rows=pSeasonRows(p), tot=pTotals(rows);
