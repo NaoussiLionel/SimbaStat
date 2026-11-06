@@ -1139,10 +1139,9 @@ const pSeasonRows=p=>{
   const ev=pEvents(p), has26=ev.length>0;
   const s25=S25.find(s=>pfid(s[0])===p[2]), s24=S24.find(s=>pfid(s[0])===p[2]);
   const cur=ev[0]?ev[0].t:null;
-  const eventMatches=new Set(ev.map(e=>e.m));
   const base={appearances:"n.d.",yellow:"n.d.",red:"n.d."};
   return [
-    {key:"26",label:"2026/27",club:cur,appearances:has26?eventMatches.size:base.appearances,goals:has26?ev.filter(e=>pNameMatch(e.p,p)).length:"—",assists:has26?ev.filter(e=>e.a&&pNameMatch(e.a,p)).length:"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:false},
+    {key:"26",label:"2026/27",club:cur,appearances:base.appearances,goals:has26?ev.filter(e=>pNameMatch(e.p,p)).length:"—",assists:has26?ev.filter(e=>e.a&&pNameMatch(e.a,p)).length:"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:false},
     {key:"25",label:"2025/26",club:s25?s25[1]:p[1],appearances:base.appearances,goals:s25?s25[2]:"—",assists:S25A[p[2]]??"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:false},
     {key:"24",label:"2024/25",club:s24?s24[1]:p[1],appearances:base.appearances,goals:s24?s24[2]:"—",assists:S24A[p[2]]??"—",yellow:base.yellow,red:base.red,comp:"Elite One",ref:!s24}
   ];
@@ -1340,7 +1339,7 @@ function initPrivacyConsent(){
     </div>\`;
   document.body.appendChild(panel);
   const float=document.createElement("button");
-  float.type="button";float.className="cookie-float";float.title="Gérer mes préférences de confidentialité";float.setAttribute("aria-label","Gérer mes préférences de confidentialité");float.textContent="⚙";
+  float.type="button";float.className="cookie-float";float.title="Gérer mes préférences de confidentialité";float.setAttribute("aria-label","Gérer mes préférences de confidentialité");float.textContent="P";
   document.body.appendChild(float);
   const close=choices=>{
     localStorage.setItem(key,JSON.stringify({necessary:true,analytics:!!choices.analytics,personalization:!!choices.personalization,ads:!!choices.ads,updatedAt:new Date().toISOString()}));
