@@ -1,4 +1,4 @@
-export type MatchStatus = 'scheduled' | 'played' | 'postponed' | 'awaiting_confirmation'
+export type MatchStatus = 'scheduled' | 'played' | 'postponed' | 'awaiting_confirmation' | 'projected'
 
 export type League = {
   id: string
@@ -8,59 +8,40 @@ export type League = {
   country: 'CMR'
 }
 
-export type Season = {
-  id: string
-  leagueId: string
-  label: string
-  startsAt: string | null
-  endsAt: string | null
-  status: 'upcoming' | 'active' | 'complete'
-}
-
-export type Match = {
-  id: string
+export type EliteTwoData = {
   seasonId: string
-  round: number
-  kickoff: string | null
-  homeClubId: string
-  awayClubId: string
-  homeScore: number | null
-  awayScore: number | null
-  status: MatchStatus
-  venue: string | null
-  sourceIds: string[]
+  competition: { id: string; name: string; season: string; level: 2 }
+  clubs: Array<{ id: string; name: string }>
+  matches: Array<{
+    id: string
+    round: number
+    date: string | null
+    home: string
+    away: string
+    homeScore: number | null
+    awayScore: number | null
+    status: MatchStatus
+    sourceUrl?: string | null
+    verifiedAt?: string | null
+  }>
+  predictions?: Array<{ id: string; round: number; home: string; away: string; status: 'projected'; confidence: 'low' }>
 }
 
-export type Standing = {
-  clubId: string
-  played: number
-  won: number
-  drawn: number
-  lost: number
-  goalsFor: number
-  goalsAgainst: number
-  goalDifference: number
-  points: number
-  form: Array<'W' | 'D' | 'L' | null>
-}
-
-const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '')
+const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api/v1'
 
 async function get<T>(path: string): Promise<T> {
-  if (!apiBase) throw new Error('VITE_API_BASE_URL is not configured')
   const response = await fetch(`${apiBase}${path}`, { headers: { Accept: 'application/json' } })
   if (!response.ok) throw new Error(`Simba API request failed (${response.status})`)
   return response.json() as Promise<T>
 }
 
 export const simbaApi = {
-  leagues: () => get<League[]>('/competitions'),
-  seasons: (leagueId: string) => get<Season[]>(`/competitions/${encodeURIComponent(leagueId)}/seasons`),
-  standings: (seasonId: string) => get<Standing[]>(`/seasons/${encodeURIComponent(seasonId)}/standings`),
-  matches: (seasonId: string, params: { round?: number; clubId?: string } = {}) => {
+  competitions: () => get<League[]>('/competitions'),
+  eliteTwo: () => get<EliteTwoData>('/data/elite-two-2026-27'),
+  matches: (seasonId: string, params: { round?: number; club?: string } = {}) => {
     const query = new URLSearchParams()
     if (params.round) query.set('round', String(params.round))
-    if (params.clubId) query.set('club', params.clubId)
-    return get<Match[]>(`/seasons/${encodeURIComponent(seasonId)}/matches${query.size ? `?${query}` : ''}`)
+    if (params.club) query.set('club', params.club)
+    return get<EliteTwoData['matches']>(`/seasons/${encodeURIComponent(seasonId)}/matches${query.size ? `?${query}` : ''}`)
   },
 }

@@ -3,6 +3,7 @@
 ## Source register (reviewed 5 November 2026)
 
 - FECAFOOT is the primary source for competition calendars, qualified player lists, and official regulations. The 2026/27 Elite One and Elite Two calendars are published as PDFs on 13 October 2026.
+- FECAFOOT published its 2026/27 qualified-player and team-official list on 17 October ([official PDF](https://fecafoot-officiel.com/wp-content/uploads/2026/10/LISTES-MTN-ELITE-ONE-26-27.pdf)). It labels registered persons as players or team officials, but does not assign each team official a leadership or coaching role and is not a match sheet. Do not use it to populate the president, head coach, or starting XI fields.
 - FECAFOOT's Elite Two page currently presents the competition in two groups, while the 2026/27 regulations/news describe a single 12-club group. Resolve this source conflict against the actual signed calendar and current federation notices before importing standings.
 - Inside Cameroon Sport publishes 2026/27 Elite One match results and a live table; use it only as a secondary cross-check, with each result carrying a source URL and verification status.
 - Eurosport has match listings/results for Elite One and is a secondary cross-check, not the source of truth for player identities or disciplinary decisions.
@@ -23,33 +24,38 @@ The app should consume normalized records, not scrape presentation markup:
 
 Standings, best attack/defence, goal totals, and form should be derived from verified match records. Individual goalkeeper clean sheets require goalkeeper appearances or official keeper statistics; do not infer them from team shutouts.
 
-## Suggested endpoints
+## Implemented routes
 
 - `GET /api/v1/competitions`
-- `GET /api/v1/seasons/:seasonId/standings`
-- `GET /api/v1/seasons/:seasonId/matches?round=&club=`
-- `GET /api/v1/seasons/:seasonId/leaders?metric=goals|assists|keeper_clean_sheets`
+- `GET /api/v1/data/elite-two-2026-27`
+- `GET /api/v1/seasons/elite-two-2026-27/matches?round=&club=`
 - `GET /api/v1/seasons/elite-one-2026-27/lineups` returns confirmed match sheets with formation, starters, substitutes, source URL, verification time, and status. The club roster view uses published match lineups when available; it does not derive a starting XI from registered players.
 - `GET /api/v1/seasons/elite-one-2026-27/club-directory` returns club leadership, technical staff, stadium details, and source/verification metadata. Unknown fields remain `null` and appear as “À confirmer” in the interface.
 - `POST /api/v1/admin/imports` for authenticated data updates. Imports validate every match and source before writing, reject duplicate IDs and unsafe scores, and return `409` when a confirmed score changes. After checking the source, an administrator can explicitly approve the conflict with `reviewConflicts: true` and a `reviewNote`.
 - `GET /api/v1/admin/imports` returns the latest 50 import revisions to an authenticated administrator. Each revision records the source, checksum, before/after values, review note, timestamp, and write status. Runtime history is stored in the ignored `data/import-audit.json` file.
 - `POST /api/v1/admin/imports/:revisionId/rollback` restores an applied revision only when the affected match records have not changed since it was applied; a review note is required.
 
+Season-list, generic standings, and player-leader routes are not implemented yet. The browser client calls only the routes listed above.
+
 The current local data files are `data/elite-one-2026-27-lineups.json` and `data/club-directory-elite-one-2026-27.json`. Populate a field only after checking an attributable federation or club source; include `sourceUrl` and `verifiedAt` with each verified update. Do not infer home grounds, officials, staff, or lineups.
 
 ## Current local API
 
-Run the Vite app from `V2`; its dev and preview servers mount the API handler in-process, so browser requests do not depend on a separate localhost port. `npm run api` remains available when the API needs to run as a standalone local service. The client reads Elite Two from `GET /api/v1/data/elite-two-2026-27`.
+Run the Vite app from the repository root; its dev and preview servers mount the API handler in-process, so browser requests do not depend on a separate localhost port. `npm run api` remains available when the API needs to run as a standalone local service. The client reads Elite Two from `GET /api/v1/data/elite-two-2026-27`.
 
 Optional accounts are supported by `POST /api/v1/account/register`, `POST /api/v1/account/login`, `GET /api/v1/account/me`, `PUT /api/v1/account/preferences`, and `POST /api/v1/account/logout`. Sessions use an HttpOnly, SameSite=Lax cookie; password hashes use Node scrypt. Account records are written to the ignored local file `data/accounts.json`.
 
+The local rate limiter counts failed sign-in and duplicate/invalid registration attempts only, resets successful sign-ins, and prunes expired entries. By default it uses the direct socket address. Set `SIMBA_TRUST_PROXY=true` only when a trusted reverse proxy removes incoming forwarding headers and writes its own `X-Forwarded-For` value. File mutations are serialized within one Node process; this does not make the JSON store safe across multiple server instances.
+
 This file-backed account store is for local development only. Before public launch, move users and sessions to a managed database, add email verification and password recovery, and configure a real push service with VAPID keys. The service worker can display push events, but push delivery is not configured yet. The preferences screen asks permission for browser notifications and stores followed clubs and competition interests, but it does not claim that live alerts are being sent until that delivery service is connected.
 
-The manifest and service worker make the V2 site installable as a PWA. `localhost` is treated as a secure development origin by browsers. A deployed app must be served over HTTPS with a valid certificate from its hosting provider; do not install a self-signed certificate on visitors' phones.
+The manifest and service worker make the site installable as a PWA. `localhost` is treated as a secure development origin by browsers. A deployed app must be served over HTTPS with a valid certificate from its hosting provider; do not install a self-signed certificate on visitors' phones.
 
 On HTTPS, account cookies are marked Secure automatically when the TLS proxy sends `X-Forwarded-Proto: https`. Keep the proxy private to the app server and configure it to overwrite that header.
 
 The Vite client may know only `VITE_API_BASE_URL`, which is public configuration. Any provider/internal API key belongs in a server-only environment variable such as `SIMBA_PROVIDER_API_KEY`; never prefix it with `VITE_`, include it in HTML, or send it to browsers. Admin writes should use separate authentication, not the provider key.
+
+The Vite dev/preview servers and the generated Netlify `_headers` file apply a restrictive script policy, frame denial, MIME sniffing protection, referrer policy, and permissions policy. The app script is externalized to allow `script-src 'self'`; inline style attributes remain enabled for the current visual system. Configure equivalent headers on any other hosting provider.
 
 ## Import and update lifecycle
 

@@ -1,14 +1,5 @@
-const CACHE = "simba-shell-v3";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/simba-mark.svg"];
-
-function withLegalLinks(response) {
-  if (!response || !response.ok || !response.headers.get("content-type")?.includes("text/html")) return response;
-  return response.text().then(html => {
-    const legal = `<footer style="max-width:1120px;margin:0 auto;padding:28px 16px 42px;color:#5b6b61;font:12px/1.5 system-ui,-apple-system,sans-serif;border-top:1px solid #dbe5de"><div style="display:flex;flex-wrap:wrap;gap:14px"><a href="/mentions-legales/" style="color:#0b5d33">Mentions légales</a><a href="/confidentialite/" style="color:#0b5d33">Confidentialité</a><a href="/cookies/" style="color:#0b5d33">Cookies</a><a href="/conditions/" style="color:#0b5d33">Conditions</a></div><div style="margin-top:10px">Simba Stat · Naoussi Industries</div></footer>`;
-    if (html.includes("</body>") && !html.includes("data-simba-legal-footer")) html = html.replace("</body>", `<div data-simba-legal-footer="1">${legal}</div></body>`);
-    return new Response(html, { status: response.status, statusText: response.statusText, headers: response.headers });
-  });
-}
+const CACHE = "simba-shell-v4";
+const SHELL = ["/", "/manifest.webmanifest", "/icons/simba-mark.svg", "/icons/simba-mark-180.png", "/icons/simba-mark-192.png", "/icons/simba-mark-512.png"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));
@@ -55,14 +46,16 @@ self.addEventListener("fetch", event => {
     return;
   }
   event.respondWith((async () => {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    const response = await fetch(request);
-    if (response.ok && response.type === "basic") {
-      const copy = response.clone();
-      event.waitUntil(caches.open(CACHE).then(cache => cache.put(request, copy)).catch(() => {}));
+    try {
+      const response = await fetch(request, { cache: "no-store" });
+      if (response.ok && response.type === "basic") {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE).then(cache => cache.put(request, copy)).catch(() => {}));
+      }
+      return response;
+    } catch {
+      return (await caches.match(request)) || Response.error();
     }
-    return response;
   })());
 });
 

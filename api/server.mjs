@@ -3,7 +3,6 @@ import { createServer } from 'node:http'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { get, put } from '@vercel/blob'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataFile = path.resolve(here, '../data/elite-two-2026-27.json')
@@ -22,6 +21,10 @@ const port = Number(process.env.SIMBA_API_PORT || 3000)
 const prefix = '/api/v1'
 
 const json = (res, status, value, cacheControl = 'no-store') => {
+  res.setHeader('x-content-type-options', 'nosniff')
+  res.setHeader('x-frame-options', 'DENY')
+  res.setHeader('referrer-policy', 'strict-origin-when-cross-origin')
+  res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()')
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': cacheControl })
   res.end(JSON.stringify(value))
 }
@@ -33,33 +36,13 @@ async function readJsonFile(file) {
   return JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''))
 }
 
-const accountsBlobPath = 'simba-stat/accounts.json'
-
 async function readAccounts() {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    try {
-      const result = await get(accountsBlobPath, { access: 'private', useCache: false })
-      if (!result) return { users: [], sessions: [] }
-      const text = await new Response(result.stream).text()
-      return JSON.parse(text.replace(/^\uFEFF/, ''))
-    } catch (error) {
-      if (error?.statusCode === 404 || error?.status === 404) return { users: [], sessions: [] }
-      throw error
-    }
-  }
   try { return JSON.parse((await readFile(accountsFile, 'utf8')).replace(/^\uFEFF/, '')) }
   catch (error) { if (error.code === 'ENOENT') return { users: [], sessions: [] }; throw error }
 }
-
 async function writeAccounts(db) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.VERCEL) throw new Error('BLOB_READ_WRITE_TOKEN is not configured on Vercel')
-  const payload = JSON.stringify(db, null, 2) + '\n'
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    await put(accountsBlobPath, payload, { access: 'private', allowOverwrite: true })
-    return
-  }
   const temp = `${accountsFile}.tmp`
-  await writeFile(temp, payload, 'utf8')
+  await writeFile(temp, JSON.stringify(db, null, 2) + '\n', 'utf8')
   await rename(temp, accountsFile)
 }
 async function writeJsonAtomically(file, value) {
@@ -75,16 +58,50 @@ const digest = value => createHash('sha256').update(value).digest('hex')
 const passwordHash = (password, salt) => new Promise((resolve, reject) => {
   scrypt(password, salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex')))
 })
+const dummySalt = '0'.repeat(32)
+const dummyPasswordHash = await passwordHash('Simba Stat invalid login', dummySalt)
 const tokenFrom = req => {
   const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith('simba_session='))
   return cookie ? digest(decodeURIComponent(cookie.slice('simba_session='.length))) : null
 }
 const sessionCookie = (req, value, maxAge = 2592000) => `simba_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${req.socket.encrypted || req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`
 const attempts = new Map()
+let lastAttemptCleanup = 0
+let accountWriteQueue = Promise.resolve()
+let importWriteQueue = Promise.resolve()
+function withAccountLock(operation) {
+  const next = accountWriteQueue.then(operation, operation)
+  accountWriteQueue = next.then(() => undefined, () => undefined)
+  return next
+}
+function withImportLock(operation) {
+  const next = importWriteQueue.then(operation, operation)
+  importWriteQueue = next.then(() => undefined, () => undefined)
+  return next
+}
+function clientAddress(req) {
+  if (process.env.SIMBA_TRUST_PROXY === 'true') {
+    const forwarded = req.headers['x-forwarded-for']
+    if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim()
+  }
+  return req.socket.remoteAddress || 'unknown'
+}
 function rateLimited(req) {
-  const key = req.socket.remoteAddress || 'unknown', now = Date.now(), entry = attempts.get(key)
-  if (!entry || now - entry.time > 900000) { attempts.set(key, { time: now, count: 1 }); return false }
-  return ++entry.count > 8
+  const now = Date.now()
+  if (now - lastAttemptCleanup > 60000) {
+    for (const [key, entry] of attempts) if (now - entry.time > 900000) attempts.delete(key)
+    lastAttemptCleanup = now
+  }
+  const entry = attempts.get(clientAddress(req))
+  return !!entry && now - entry.time <= 900000 && entry.count >= 8
+}
+function failedAttempt(req) {
+  const key = clientAddress(req), now = Date.now(), entry = attempts.get(key)
+  if (!entry || now - entry.time > 900000) attempts.set(key, { time: now, count: 1 })
+  else { entry.count++; entry.time = now }
+}
+function clearFailedAttempts(req) {
+  attempts.delete(clientAddress(req))
 }
 function cleanPreferences(value = {}) {
   if (!value || typeof value !== 'object') value = {}
@@ -125,25 +142,42 @@ export async function handleApiRequest(req, res) {
 
     if (url.pathname === `${prefix}/account/register` && req.method === 'POST') {
       if (rateLimited(req)) return json(res, 429, { error: 'Trop de tentatives. Réessayez dans quelques minutes.' })
-      const input = await body(req), email = String(input.email || '').trim().toLowerCase(), password = String(input.password || '')
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 6 || password.length > 200) return json(res, 400, { error: 'Vérifiez votre adresse e-mail et choisissez un mot de passe de 6 caractères minimum.' })
-      const db = await readAccounts()
-      if (db.users.some(user => user.email === email)) return json(res, 409, { error: 'Un compte existe déjà avec cette adresse e-mail.' })
+      const input = await body(req) || {}, email = String(input.email || '').trim().toLowerCase(), password = String(input.password || '')
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 12 || password.length > 200) {
+        failedAttempt(req)
+        return json(res, 400, { error: 'Impossible de créer le compte. Vérifiez les informations ou connectez-vous si vous avez déjà un compte.' })
+      }
       const salt = randomBytes(16).toString('hex'), user = { id: randomBytes(16).toString('hex'), email, salt, passwordHash: await passwordHash(password, salt), preferences: cleanPreferences(input.preferences), createdAt: new Date().toISOString() }
-      const token = randomBytes(32).toString('base64url')
-      db.users.push(user); db.sessions.push({ tokenHash: digest(token), userId: user.id, expiresAt: Date.now() + 2592000000 })
-      await writeAccounts(db); res.setHeader('set-cookie', sessionCookie(req, token))
-      return json(res, 201, { account: { email: user.email }, preferences: user.preferences, message: 'Compte créé' })
+      return withAccountLock(async () => {
+        const db = await readAccounts()
+        if (db.users.some(existing => existing.email === email)) {
+          failedAttempt(req)
+          return json(res, 400, { error: 'Impossible de créer le compte. Vérifiez les informations ou connectez-vous si vous avez déjà un compte.' })
+        }
+        const token = randomBytes(32).toString('base64url')
+        db.users.push(user); db.sessions.push({ tokenHash: digest(token), userId: user.id, expiresAt: Date.now() + 2592000000 })
+        await writeAccounts(db); clearFailedAttempts(req); res.setHeader('set-cookie', sessionCookie(req, token))
+        return json(res, 201, { account: { email: user.email }, preferences: user.preferences, message: 'Compte créé' })
+      })
     }
 
     if (url.pathname === `${prefix}/account/login` && req.method === 'POST') {
       if (rateLimited(req)) return json(res, 429, { error: 'Trop de tentatives. Réessayez dans quelques minutes.' })
-      const input = await body(req), email = String(input.email || '').trim().toLowerCase(), password = String(input.password || ''), db = await readAccounts()
-      const user = db.users.find(item => item.email === email)
-      if (!user || !timingSafeEqual(Buffer.from(await passwordHash(password, user.salt)), Buffer.from(user.passwordHash))) return json(res, 401, { error: 'Adresse e-mail ou mot de passe incorrect.' })
-      const token = randomBytes(32).toString('base64url'); db.sessions = db.sessions.filter(session => session.expiresAt > Date.now() && session.userId !== user.id); db.sessions.push({ tokenHash: digest(token), userId: user.id, expiresAt: Date.now() + 2592000000 })
-      await writeAccounts(db); res.setHeader('set-cookie', sessionCookie(req, token))
-      return json(res, 200, { account: { email: user.email }, preferences: user.preferences })
+      const input = await body(req) || {}, email = String(input.email || '').trim().toLowerCase(), suppliedPassword = String(input.password || ''), validInput = suppliedPassword.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+      const password = suppliedPassword.slice(0, 200)
+      return withAccountLock(async () => {
+        const db = await readAccounts(), user = db.users.find(item => item.email === email)
+        const candidate = Buffer.from(await passwordHash(password, user?.salt || dummySalt))
+        const stored = /^[a-f0-9]{128}$/i.test(user?.passwordHash || '') ? Buffer.from(user.passwordHash) : Buffer.from(dummyPasswordHash)
+        const matches = timingSafeEqual(candidate, stored)
+        if (!validInput || !user || !matches) {
+          failedAttempt(req)
+          return json(res, 401, { error: 'Adresse e-mail ou mot de passe incorrect.' })
+        }
+        const token = randomBytes(32).toString('base64url'); db.sessions = db.sessions.filter(session => session.expiresAt > Date.now() && session.userId !== user.id); db.sessions.push({ tokenHash: digest(token), userId: user.id, expiresAt: Date.now() + 2592000000 })
+        await writeAccounts(db); clearFailedAttempts(req); res.setHeader('set-cookie', sessionCookie(req, token))
+        return json(res, 200, { account: { email: user.email }, preferences: user.preferences })
+      })
     }
 
     if (url.pathname === `${prefix}/account/me` && req.method === 'GET') {
@@ -152,16 +186,21 @@ export async function handleApiRequest(req, res) {
     }
 
     if (url.pathname === `${prefix}/account/preferences` && req.method === 'PUT') {
-      const db = await readAccounts(), session = db.sessions.find(item => item.tokenHash === tokenFrom(req) && item.expiresAt > Date.now()), user = session && db.users.find(item => item.id === session.userId)
-      if (!user) return json(res, 401, { error: 'Not signed in' })
-      const input = await body(req), prefs = input.preferences || {}
-      user.preferences = cleanPreferences(prefs)
-      await writeAccounts(db); return json(res, 200, { preferences: user.preferences })
+      const input = await body(req) || {}, prefs = input.preferences || {}, token = tokenFrom(req)
+      return withAccountLock(async () => {
+        const db = await readAccounts(), session = db.sessions.find(item => item.tokenHash === token && item.expiresAt > Date.now()), user = session && db.users.find(item => item.id === session.userId)
+        if (!user) return json(res, 401, { error: 'Not signed in' })
+        user.preferences = cleanPreferences(prefs)
+        await writeAccounts(db); return json(res, 200, { preferences: user.preferences })
+      })
     }
 
     if (url.pathname === `${prefix}/account/logout` && req.method === 'POST') {
-      const db = await readAccounts(), token = tokenFrom(req); db.sessions = db.sessions.filter(item => item.tokenHash !== token); await writeAccounts(db)
-      res.setHeader('set-cookie', sessionCookie(req, '', 0)); return json(res, 200, { ok: true })
+      const token = tokenFrom(req)
+      return withAccountLock(async () => {
+        const db = await readAccounts(); db.sessions = db.sessions.filter(item => item.tokenHash !== token); await writeAccounts(db)
+        res.setHeader('set-cookie', sessionCookie(req, '', 0)); return json(res, 200, { ok: true })
+      })
     }
 
     if (req.method === 'GET' && url.pathname === `${prefix}/competitions`) {
@@ -182,8 +221,9 @@ export async function handleApiRequest(req, res) {
     if (rollbackPath && req.method === 'POST') {
       if (!process.env.SIMBA_ADMIN_API_KEY) return json(res, 503, { error: 'Admin updates are not configured' })
       if (!authorized(req)) return json(res, 401, { error: 'Unauthorized' })
-      const { reviewNote = '' } = await body(req)
+      const rollbackInput = await body(req) || {}, reviewNote = rollbackInput.reviewNote || ''
       if (!String(reviewNote).trim()) return json(res, 400, { error: 'A reviewNote is required for rollback.' })
+      return withImportLock(async () => {
       const audit = await readImportAudit(), sourceRevision = audit.find(item => item.id === rollbackPath[1] && item.status === 'applied')
       if (!sourceRevision) return json(res, 404, { error: 'Applied revision not found' })
       const data = await readData(), changed = []
@@ -207,6 +247,7 @@ export async function handleApiRequest(req, res) {
       revision.status = 'applied'
       await writeJsonAtomically(importAuditFile, audit)
       return json(res, 200, { rolledBack: changed.length, revisionId: revision.id, rollbackOf: sourceRevision.id })
+      })
     }
 
     if (req.method === 'GET' && url.pathname === `${prefix}/data/elite-two-2026-27`) {
@@ -224,15 +265,17 @@ export async function handleApiRequest(req, res) {
     if (req.method === 'GET' && url.pathname === `${prefix}/seasons/elite-two-2026-27/matches`) {
       const data = await readData()
       const round = Number(url.searchParams.get('round'))
+      const club = url.searchParams.get('club')
       const matches = [...data.matches, ...(data.predictions || [])]
-      return json(res, 200, Number.isInteger(round) && round > 0 ? matches.filter(m => m.round === round) : matches)
+      return json(res, 200, matches.filter(m => (!Number.isInteger(round) || round <= 0 || m.round === round) && (!club || m.home === club || m.away === club)))
     }
 
     if (req.method === 'POST' && url.pathname === `${prefix}/admin/imports`) {
       if (!process.env.SIMBA_ADMIN_API_KEY) return json(res, 503, { error: 'Admin updates are not configured' })
       if (!authorized(req)) return json(res, 401, { error: 'Unauthorized' })
-      const input = await body(req)
+      const input = await body(req) || {}
       if (!Array.isArray(input.matches) || !input.matches.length || input.matches.length > 100) return json(res, 400, { error: 'Provide between 1 and 100 match updates' })
+      return withImportLock(async () => {
       const data = await readData()
       const clubIds = new Set(data.clubs.map(club => club.id)), seen = new Set(), prepared = []
       for (const update of input.matches) {
@@ -246,7 +289,7 @@ export async function handleApiRequest(req, res) {
         seen.add(update.id)
         prepared.push({ current, update, sourceUrl })
       }
-      const conflicts = prepared.filter(({ current, update }) => current.status === 'played' && (current.homeScore !== update.homeScore || current.awayScore !== update.awayScore))
+      const conflicts = prepared.filter(({ current, update }) => current.status === 'postponed' || (current.status === 'played' && (current.homeScore !== update.homeScore || current.awayScore !== update.awayScore)))
       if (conflicts.length && input.reviewConflicts !== true) return json(res, 409, { error: 'Conflicting confirmed scores need review before they can be changed.', conflicts: conflicts.map(({ current, update }) => ({ id: current.id, current: [current.homeScore, current.awayScore], incoming: [update.homeScore, update.awayScore] })), action: 'Repeat the import with reviewConflicts=true and a reviewNote after checking the source.' })
       if (conflicts.length && !String(input.reviewNote || '').trim()) return json(res, 400, { error: 'A reviewNote is required when approving changed confirmed scores.' })
 
@@ -263,6 +306,7 @@ export async function handleApiRequest(req, res) {
       revision.status = 'applied'
       await writeJsonAtomically(importAuditFile, audit)
       return json(res, 200, { updated: changes.length, revisionId: revision.id, checksum: revision.checksum })
+      })
     }
 
     return json(res, 404, { error: 'Not found' })
