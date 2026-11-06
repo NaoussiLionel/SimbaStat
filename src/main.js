@@ -1322,7 +1322,7 @@ function initPrivacyConsent(){
   panel.className="cookie-consent";
   panel.hidden=!!saved;
   panel.setAttribute("aria-labelledby","cookieTitle");
-  panel.innerHTML=\`
+  panel.innerHTML=`
     <h2 id="cookieTitle">Nous respectons votre vie privée</h2>
     <p>SimbaStat utilise des cookies et technologies similaires pour assurer le fonctionnement du site et mémoriser vos choix. Les catégories optionnelles restent désactivées tant que vous ne les avez pas acceptées. Consultez notre <a href="/confidentialite/">Politique de confidentialité</a> et notre <a href="/cookies/">Politique cookies</a>.</p>
     <div class="cookie-actions">
@@ -1336,7 +1336,7 @@ function initPrivacyConsent(){
       <label class="cookie-option"><span><b>Personnalisation</b><span>Permettrait de mémoriser des préférences avancées si cette fonctionnalité est activée.</span></span><input id="cookiePersonalization" type="checkbox"></label>
       <label class="cookie-option"><span><b>Publicité</b><span>Permettrait d'activer des technologies publicitaires si SimbaStat en utilise.</span></span><input id="cookieAds" type="checkbox"></label>
       <div class="cookie-actions"><button type="button" data-cookie="save" class="primary">Enregistrer mes choix</button></div>
-    </div>\`;
+    </div>`;
   document.body.appendChild(panel);
   const float=document.createElement("button");
   float.type="button";float.className="cookie-float";float.title="Gérer mes préférences de confidentialité";float.setAttribute("aria-label","Gérer mes préférences de confidentialité");float.textContent="P";
